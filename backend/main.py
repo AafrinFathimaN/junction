@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 from ml_models import delay_predictor
 from optimization_engine import schedule_optimizer, lns_optimizer
 from decision_history import decision_history
+from sandbox_simulator import sandbox_simulator
 
 app = FastAPI(title="Junction Genius AI Backend", version="1.0.0")
 
@@ -47,6 +48,13 @@ class DecisionAction(BaseModel):
     controller_id: Optional[str] = None
     feedback_score: Optional[float] = None
     context: Optional[str] = None
+
+class SandboxRequest(BaseModel):
+    trains: List[Dict[str, Any]]
+    tracks: List[Dict[str, Any]]
+    weather_conditions: Optional[Dict[str, Any]] = None
+    time_horizon: Optional[int] = 120
+    apply_optimization: Optional[bool] = True
 
 # ---- Mock Data ----
 ai_decisions_data = [
@@ -358,6 +366,134 @@ def record_model_feedback(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to record feedback: {str(e)}")
 
+# ---- Sandbox & Analytics Endpoints ----
+
+@app.post("/sandbox/evaluate")
+def evaluate_sandbox_scenario(request: SandboxRequest):
+    """
+    Evaluate a sandbox scenario with dynamic recalculation
+    Returns comprehensive metrics and optimization results
+    """
+    try:
+        # Create scenario
+        scenario = sandbox_simulator.create_scenario(
+            trains=request.trains,
+            tracks=request.tracks,
+            weather_conditions=request.weather_conditions,
+            time_horizon=request.time_horizon
+        )
+        
+        # Get optimization if requested
+        optimization_result = None
+        if request.apply_optimization:
+            try:
+                # Use existing optimization engine
+                optimization_result = schedule_optimizer.optimize_schedule(
+                    trains=request.trains,
+                    tracks=request.tracks,
+                    current_schedule={train['id']: {'scheduled_time': 0} for train in request.trains}
+                )
+                
+                # Apply LNS if CP succeeded
+                if optimization_result.get('method') != 'heuristic_fallback':
+                    optimization_result = lns_optimizer.optimize(
+                        initial_solution=optimization_result,
+                        trains=request.trains,
+                        tracks=request.tracks
+                    )
+            except Exception as opt_error:
+                print(f"Optimization failed: {opt_error}")
+                optimization_result = None
+        
+        # Evaluate scenario
+        evaluation = sandbox_simulator.evaluate_scenario(scenario, optimization_result)
+        
+        return {
+            "success": True,
+            "scenario": scenario,
+            "evaluation": evaluation,
+            "optimization_applied": optimization_result is not None,
+            "optimization_result": optimization_result
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Sandbox evaluation failed: {str(e)}")
+
+@app.get("/analytics/performance")
+def get_performance_analytics():
+    """
+    Get comprehensive performance analytics
+    Returns sandbox efficiency, decision success rate, and train punctuality
+    """
+    try:
+        # Get sandbox analytics
+        sandbox_analytics = sandbox_simulator.get_performance_analytics()
+        
+        # Get decision history analytics
+        decision_stats = decision_history.get_decision_stats()
+        
+        # Get model performance
+        delay_performance = decision_history.get_model_performance("delay_prediction")
+        routing_performance = decision_history.get_model_performance("routing")
+        
+        # Combine all analytics
+        performance_analytics = {
+            "sandbox_efficiency": {
+                "total_simulations": sandbox_analytics["total_simulations"],
+                "average_efficiency_score": sandbox_analytics["average_efficiency_score"],
+                "total_delays_avoided": sandbox_analytics["total_delays_avoided"],
+                "total_conflicts_resolved": sandbox_analytics["total_conflicts_resolved"],
+                "average_punctuality_rate": sandbox_analytics["average_punctuality_rate"],
+                "recommendations": sandbox_analytics["recommendations"]
+            },
+            "decision_success_rate": {
+                "total_decisions": decision_stats["total_decisions"],
+                "acceptance_rate": decision_stats["acceptance_rate"],
+                "average_feedback_score": decision_stats["average_feedback_score"],
+                "decision_types": decision_stats["decision_types"]
+            },
+            "train_punctuality": {
+                "current_punctuality_rate": sandbox_analytics["average_punctuality_rate"],
+                "punctuality_trend": "improving" if sandbox_analytics["average_punctuality_rate"] > 0.8 else "needs_attention",
+                "delay_prediction_accuracy": delay_performance.get("average_prediction_error", 0),
+                "routing_optimization_score": routing_performance.get("average_feedback_score", 0)
+            },
+            "model_performance": {
+                "delay_prediction": delay_performance,
+                "routing_optimization": routing_performance
+            },
+            "overall_system_health": {
+                "status": "excellent" if sandbox_analytics["average_efficiency_score"] > 80 else 
+                         "good" if sandbox_analytics["average_efficiency_score"] > 60 else "needs_improvement",
+                "efficiency_score": sandbox_analytics["average_efficiency_score"],
+                "key_metrics": {
+                    "ai_acceptance_rate": decision_stats["acceptance_rate"],
+                    "punctuality_rate": sandbox_analytics["average_punctuality_rate"],
+                    "conflicts_resolved_rate": sandbox_analytics["total_conflicts_resolved"] / max(1, sandbox_analytics["total_simulations"])
+                }
+            },
+            "generated_at": datetime.now().isoformat()
+        }
+        
+        return {
+            "success": True,
+            "analytics": performance_analytics
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get performance analytics: {str(e)}")
+
+@app.get("/sandbox/scenarios")
+def get_sandbox_scenarios():
+    """Get all sandbox simulation results"""
+    try:
+        return {
+            "success": True,
+            "scenarios": sandbox_simulator.simulation_results,
+            "total_scenarios": len(sandbox_simulator.simulation_results)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get scenarios: {str(e)}")
 
 # ---- WebSocket for Real-Time Train Updates ----
 @app.websocket("/ws/trains")

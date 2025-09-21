@@ -2,29 +2,42 @@ import React, { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { BarChart3, TrendingUp, Brain, Clock, CheckCircle, XCircle } from 'lucide-react'
+import { BarChart3, TrendingUp, Brain, Clock, CheckCircle, XCircle, Activity, Target, Zap } from 'lucide-react'
 
-interface AnalyticsData {
-  total_decisions: number
-  acceptance_rate: number
-  average_feedback_score: number
-  decision_types: Record<string, number>
-  hourly_patterns: Record<string, number>
-}
-
-interface ModelPerformance {
-  total_feedback_records: number
-  average_feedback_score: number
-  average_prediction_error: number
-  model_type: string
+interface PerformanceAnalytics {
+  sandbox_efficiency: {
+    total_simulations: number
+    average_efficiency_score: number
+    total_delays_avoided: number
+    total_conflicts_resolved: number
+    average_punctuality_rate: number
+    recommendations: string[]
+  }
+  decision_success_rate: {
+    total_decisions: number
+    acceptance_rate: number
+    average_feedback_score: number
+    decision_types: Record<string, number>
+  }
+  train_punctuality: {
+    current_punctuality_rate: number
+    punctuality_trend: string
+    delay_prediction_accuracy: number
+    routing_optimization_score: number
+  }
+  overall_system_health: {
+    status: string
+    efficiency_score: number
+    key_metrics: {
+      ai_acceptance_rate: number
+      punctuality_rate: number
+      conflicts_resolved_rate: number
+    }
+  }
 }
 
 const Analytics: React.FC = () => {
-  const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null)
-  const [modelPerformance, setModelPerformance] = useState<{
-    delay_prediction: ModelPerformance
-    routing: ModelPerformance
-  } | null>(null)
+  const [analytics, setAnalytics] = useState<PerformanceAnalytics | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -33,11 +46,7 @@ const Analytics: React.FC = () => {
         const response = await fetch('http://localhost:8000/analytics/performance')
         if (response.ok) {
           const data = await response.json()
-          setAnalyticsData(data.overall_stats)
-          setModelPerformance({
-            delay_prediction: data.delay_prediction,
-            routing: data.routing
-          })
+          setAnalytics(data.analytics)
         }
       } catch (error) {
         console.error('Failed to fetch analytics:', error)
@@ -48,6 +57,14 @@ const Analytics: React.FC = () => {
 
     fetchAnalytics()
   }, [])
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'excellent': return 'text-green-500'
+      case 'good': return 'text-blue-500'
+      default: return 'text-yellow-500'
+    }
+  }
 
   if (loading) {
     return (
@@ -74,63 +91,118 @@ const Analytics: React.FC = () => {
       </div>
 
       {/* Overview Stats */}
-      {analyticsData && (
+      {analytics && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Decisions</CardTitle>
-              <Brain className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">System Health</CardTitle>
+              <Activity className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{analyticsData.total_decisions}</div>
-              <p className="text-xs text-muted-foreground">AI decisions processed</p>
+              <div className={`text-2xl font-bold ${getStatusColor(analytics.overall_system_health.status)}`}>
+                {analytics.overall_system_health.status.toUpperCase()}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {analytics.overall_system_health.efficiency_score.toFixed(1)}% efficiency
+              </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Acceptance Rate</CardTitle>
-              <CheckCircle className="h-4 w-4 text-green-500" />
+              <CardTitle className="text-sm font-medium">Punctuality Rate</CardTitle>
+              <Target className="h-4 w-4 text-green-500" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-500">
-                {Math.round(analyticsData.acceptance_rate * 100)}%
+                {Math.round(analytics.train_punctuality.current_punctuality_rate * 100)}%
               </div>
-              <p className="text-xs text-muted-foreground">Decisions accepted by controllers</p>
+              <p className="text-xs text-muted-foreground">
+                Trend: {analytics.train_punctuality.punctuality_trend}
+              </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Avg Feedback Score</CardTitle>
-              <TrendingUp className="h-4 w-4 text-blue-500" />
+              <CardTitle className="text-sm font-medium">AI Acceptance</CardTitle>
+              <CheckCircle className="h-4 w-4 text-blue-500" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-blue-500">
-                {analyticsData.average_feedback_score.toFixed(2)}
+                {Math.round(analytics.decision_success_rate.acceptance_rate * 100)}%
               </div>
-              <p className="text-xs text-muted-foreground">Out of 1.0 scale</p>
+              <p className="text-xs text-muted-foreground">
+                {analytics.decision_success_rate.total_decisions} total decisions
+              </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Decision Types</CardTitle>
-              <BarChart3 className="h-4 w-4 text-purple-500" />
+              <CardTitle className="text-sm font-medium">Delays Avoided</CardTitle>
+              <Zap className="h-4 w-4 text-purple-500" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-purple-500">
-                {Object.keys(analyticsData.decision_types).length}
+                {analytics.sandbox_efficiency.total_delays_avoided}
               </div>
-              <p className="text-xs text-muted-foreground">Different decision categories</p>
+              <p className="text-xs text-muted-foreground">
+                Minutes saved by AI optimization
+              </p>
             </CardContent>
           </Card>
         </div>
       )}
 
+      {/* Sandbox Efficiency */}
+      {analytics && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Sandbox Simulation Results</CardTitle>
+            <CardDescription>Performance metrics from scenario simulations</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+              <div className="text-center p-4 bg-green-50 rounded-lg">
+                <div className="text-2xl font-bold text-green-600">
+                  {analytics.sandbox_efficiency.total_simulations}
+                </div>
+                <div className="text-sm text-green-600">Total Simulations</div>
+              </div>
+              <div className="text-center p-4 bg-blue-50 rounded-lg">
+                <div className="text-2xl font-bold text-blue-600">
+                  {analytics.sandbox_efficiency.average_efficiency_score.toFixed(1)}%
+                </div>
+                <div className="text-sm text-blue-600">Average Efficiency</div>
+              </div>
+              <div className="text-center p-4 bg-purple-50 rounded-lg">
+                <div className="text-2xl font-bold text-purple-600">
+                  {analytics.sandbox_efficiency.total_conflicts_resolved}
+                </div>
+                <div className="text-sm text-purple-600">Conflicts Resolved</div>
+              </div>
+            </div>
+            
+            {analytics.sandbox_efficiency.recommendations.length > 0 && (
+              <div>
+                <h4 className="font-medium mb-2">AI Recommendations</h4>
+                <div className="space-y-2">
+                  {analytics.sandbox_efficiency.recommendations.map((rec, index) => (
+                    <div key={index} className="p-2 bg-muted rounded text-sm">
+                      {rec}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Decision Types Breakdown */}
-        {analyticsData && (
+        {analytics && (
           <Card>
             <CardHeader>
               <CardTitle>Decision Types Distribution</CardTitle>
@@ -138,7 +210,7 @@ const Analytics: React.FC = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {Object.entries(analyticsData.decision_types).map(([type, count]) => (
+                {Object.entries(analytics.decision_success_rate.decision_types).map(([type, count]) => (
                   <div key={type} className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
                       <div className="w-3 h-3 bg-primary rounded-full" />
@@ -147,8 +219,8 @@ const Analytics: React.FC = () => {
                     <div className="flex items-center space-x-2">
                       <span className="text-sm text-muted-foreground">{count} decisions</span>
                       <Badge variant="outline">
-                        {analyticsData.total_decisions > 0 
-                          ? Math.round((count / analyticsData.total_decisions) * 100) 
+                        {analytics.decision_success_rate.total_decisions > 0 
+                          ? Math.round((count / analytics.decision_success_rate.total_decisions) * 100) 
                           : 0}%
                       </Badge>
                     </div>
@@ -159,109 +231,41 @@ const Analytics: React.FC = () => {
           </Card>
         )}
 
-        {/* Hourly Patterns */}
-        {analyticsData && (
+        {/* Key Metrics */}
+        {analytics && (
           <Card>
             <CardHeader>
-              <CardTitle>Decision Activity by Hour</CardTitle>
-              <CardDescription>Peak hours for AI decision requests</CardDescription>
+              <CardTitle>Key Performance Indicators</CardTitle>
+              <CardDescription>Critical system metrics</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-2">
-                {Object.entries(analyticsData.hourly_patterns)
-                  .sort(([a], [b]) => parseInt(a) - parseInt(b))
-                  .map(([hour, count]) => (
-                    <div key={hour} className="flex items-center justify-between">
-                      <span className="text-sm font-medium">{hour}:00</span>
-                      <div className="flex items-center space-x-2">
-                        <div className="w-20 bg-muted rounded-full h-2">
-                          <div 
-                            className="bg-primary h-2 rounded-full" 
-                            style={{ 
-                              width: `${Math.max(10, (count / Math.max(...Object.values(analyticsData.hourly_patterns))) * 100)}%` 
-                            }}
-                          />
-                        </div>
-                        <span className="text-xs text-muted-foreground w-8">{count}</span>
-                      </div>
-                    </div>
-                  ))}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">AI Acceptance Rate</span>
+                  <Badge variant="outline">
+                    {Math.round(analytics.overall_system_health.key_metrics.ai_acceptance_rate * 100)}%
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Punctuality Rate</span>
+                  <Badge variant="outline">
+                    {Math.round(analytics.overall_system_health.key_metrics.punctuality_rate * 100)}%
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Conflicts Resolved Rate</span>
+                  <Badge variant="outline">
+                    {analytics.overall_system_health.key_metrics.conflicts_resolved_rate.toFixed(2)}
+                  </Badge>
+                </div>
               </div>
             </CardContent>
           </Card>
         )}
       </div>
 
-      {/* Model Performance */}
-      {modelPerformance && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Brain className="h-5 w-5" />
-                <span>Delay Prediction Model</span>
-              </CardTitle>
-              <CardDescription>Performance metrics for delay prediction AI</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Feedback Records</span>
-                  <Badge variant="outline">
-                    {modelPerformance.delay_prediction.total_feedback_records}
-                  </Badge>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Average Score</span>
-                  <Badge variant="outline">
-                    {modelPerformance.delay_prediction.average_feedback_score.toFixed(3)}
-                  </Badge>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Prediction Error</span>
-                  <Badge variant="outline">
-                    {modelPerformance.delay_prediction.average_prediction_error.toFixed(2)} min
-                  </Badge>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Brain className="h-5 w-5" />
-                <span>Routing Model</span>
-              </CardTitle>
-              <CardDescription>Performance metrics for routing optimization AI</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Feedback Records</span>
-                  <Badge variant="outline">
-                    {modelPerformance.routing.total_feedback_records}
-                  </Badge>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Average Score</span>
-                  <Badge variant="outline">
-                    {modelPerformance.routing.average_feedback_score.toFixed(3)}
-                  </Badge>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Prediction Error</span>
-                  <Badge variant="outline">
-                    {modelPerformance.routing.average_prediction_error.toFixed(2)} min
-                  </Badge>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
       {/* Performance Insights */}
+      {analytics && (
       <Card>
         <CardHeader>
           <CardTitle>Performance Insights</CardTitle>
@@ -272,12 +276,12 @@ const Analytics: React.FC = () => {
             <div className="p-4 bg-green-50 rounded-lg">
               <div className="flex items-center space-x-2 mb-2">
                 <CheckCircle className="h-4 w-4 text-green-500" />
-                <span className="font-medium text-green-700">High Acceptance Rate</span>
+                <span className="font-medium text-green-700">System Performance</span>
               </div>
               <p className="text-sm text-green-600">
-                {analyticsData && analyticsData.acceptance_rate > 0.7 
-                  ? "Controllers are accepting most AI recommendations, indicating high trust in the system."
-                  : "Consider reviewing AI decision quality to improve acceptance rates."
+                {analytics.overall_system_health.status === 'excellent'
+                  ? "System is performing excellently with high efficiency and punctuality rates."
+                  : "System performance is good but has room for improvement in key areas."
                 }
               </p>
             </div>
@@ -285,18 +289,19 @@ const Analytics: React.FC = () => {
             <div className="p-4 bg-blue-50 rounded-lg">
               <div className="flex items-center space-x-2 mb-2">
                 <TrendingUp className="h-4 w-4 text-blue-500" />
-                <span className="font-medium text-blue-700">Model Performance</span>
+                <span className="font-medium text-blue-700">AI Optimization</span>
               </div>
               <p className="text-sm text-blue-600">
-                {modelPerformance && modelPerformance.delay_prediction.average_feedback_score > 0.8
-                  ? "AI models are performing well with high feedback scores."
-                  : "AI models may benefit from additional training data."
+                {analytics.sandbox_efficiency.average_efficiency_score > 70
+                  ? "AI optimization is highly effective in reducing delays and conflicts."
+                  : "AI optimization shows potential but may need fine-tuning for better results."
                 }
               </p>
             </div>
           </div>
         </CardContent>
       </Card>
+      )}
     </div>
   )
 }

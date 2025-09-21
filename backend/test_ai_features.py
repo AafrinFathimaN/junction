@@ -155,12 +155,65 @@ def test_analytics():
         if response.status_code == 200:
             result = response.json()
             print("✅ Analytics retrieved!")
-            print(f"   Delay Prediction Performance: {result['delay_prediction']}")
-            print(f"   Overall Stats: {result['overall_stats']}")
+            print(f"   System Health: {result['analytics']['overall_system_health']['status']}")
+            print(f"   Efficiency Score: {result['analytics']['overall_system_health']['efficiency_score']}")
+            print(f"   Punctuality Rate: {result['analytics']['train_punctuality']['current_punctuality_rate']}")
         else:
             print(f"❌ Analytics failed: {response.status_code}")
     except Exception as e:
         print(f"❌ Analytics error: {e}")
+
+def test_sandbox_simulation():
+    """Test the sandbox simulation endpoint"""
+    print("\n🎮 Testing Sandbox Simulation Endpoint...")
+    
+    sandbox_data = {
+        "trains": [
+            {
+                "id": "TEST-001",
+                "route": ["A", "B", "C"],
+                "priority": 2,
+                "current_delay": 3
+            },
+            {
+                "id": "TEST-002",
+                "route": ["A", "D", "E"],
+                "priority": 1,
+                "current_delay": 0
+            }
+        ],
+        "tracks": [
+            {"id": "A", "capacity": 1, "type": "junction"},
+            {"id": "B", "capacity": 2, "type": "track"},
+            {"id": "C", "capacity": 1, "type": "platform"},
+            {"id": "D", "capacity": 1, "type": "track"},
+            {"id": "E", "capacity": 1, "type": "platform"}
+        ],
+        "weather_conditions": {
+            "visibility": 0.8,
+            "precipitation": 0.2,
+            "wind_speed": 15.0,
+            "temperature": 18.0
+        },
+        "time_horizon": 60,
+        "apply_optimization": True
+    }
+    
+    try:
+        response = requests.post(f"{BASE_URL}/sandbox/evaluate", json=sandbox_data)
+        if response.status_code == 200:
+            result = response.json()
+            print("✅ Sandbox simulation successful!")
+            evaluation = result['evaluation']
+            print(f"   Efficiency Score: {evaluation['improvements']['efficiency_score']}")
+            print(f"   Delays Avoided: {evaluation['improvements']['delays_avoided']:.1f} minutes")
+            print(f"   Conflicts Resolved: {evaluation['improvements']['conflicts_resolved']}")
+            print(f"   Punctuality Rate: {evaluation['optimized']['punctuality_rate']:.2f}")
+        else:
+            print(f"❌ Sandbox simulation failed: {response.status_code}")
+            print(response.text)
+    except Exception as e:
+        print(f"❌ Sandbox simulation error: {e}")
 
 def main():
     """Run all tests"""
@@ -184,6 +237,7 @@ def main():
     test_schedule_optimization()
     test_decision_feedback()
     test_analytics()
+    test_sandbox_simulation()
     
     print("\n🎉 All tests completed!")
     print("\n📋 Available Endpoints:")
@@ -194,6 +248,8 @@ def main():
     print("   GET /decisions/history - Decision history")
     print("   GET /analytics/performance - Model performance")
     print("   POST /feedback/model - Record model feedback")
+    print("   POST /sandbox/evaluate - Evaluate sandbox scenario")
+    print("   GET /sandbox/scenarios - Get all scenarios")
 
 if __name__ == "__main__":
     main()
